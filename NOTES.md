@@ -1,10 +1,11 @@
+ORDER Of EVENTS
+
 1- Initialize WebRTC:
 
 2- Fetch TURN credentials: [client.js - fetchTurnCredentials]
 3- Create a new RTCPeerConnection: [client.js - setupWebRTC]
 4- Create a data channel for sending messages: [client.js - setupWebRTC]
 5- Set up event handlers for the data channel and ICE candidates: [client.js - setupWebRTC]
-
 
 6- Set Up WebSocket:
 
@@ -15,7 +16,6 @@
 
 10- Create an SDP offer and set it as the local description: [client.js - setupWebRTC]
 11- Send the offer to the remote peer via WebSocket: [client.js - setupWebRTC]
-
 
 12- Handle Offer:
 
@@ -30,7 +30,6 @@
 19- Handle ICE Candidates:
 
 20- When an ICE candidate is received, add it to the corresponding RTCPeerConnection: [client.js - handleCandidate]
-
 
 21- Send Message:
 
