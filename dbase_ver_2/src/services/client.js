@@ -40,6 +40,7 @@ const getCurrentTimestamp = () => {
 
 
 const fetchTurnCredentials = async () => {
+    log('>>>>> STEP 2 <<<<<');
     try {
         const response = await fetch(`https://api.securecloudgroup.com/fetch_turn_credentials`);
         if (!response.ok) {
@@ -58,9 +59,11 @@ const fetchTurnCredentials = async () => {
             { urls: 'stun:stun4.l.google.com:19302' },
         ];
         log('client - fetchTurnCredentials - iceServers: ', iceServers);
+        log('>>>>> STEP 2 - Complete <<<<<');
         return iceServers;
     } catch (error) {
         log('Error fetching TURN server credentials:', error);
+        log('>>>>> STEP 2 - FAIL <<<<<');
         // Fallback to default STUN servers if TURN fetching fails
         return [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -73,15 +76,20 @@ const fetchTurnCredentials = async () => {
 };
 
 const initializeWebSocket = (peerId, setWsConnected, setReadyToCommunicate) => {
+    log('>>>>> STEP 6 <<<<<');
     const connect = () => {
         websocket = new WebSocket(`wss://${server_address}/ws/${peerId}`);
+        log('>>>>> STEP 6 - Complete <<<<<');
 
+        log('>>>>> STEP 7 <<<<<');
         websocket.onopen = () => {
             log(`${getCurrentTimestamp()} - WebSocket connection opened`);
             setWsConnected(true);
             startHeartbeat();
+            log('>>>>> STEP 7 - Complete <<<<<');
         };
-
+        
+        log('>>>>> STEP 8 <<<<<');
         websocket.onmessage = (event) => {
             const message = JSON.parse(event.data);
             log(`${getCurrentTimestamp()} - WebSocket message received:`, message);
@@ -97,6 +105,7 @@ const initializeWebSocket = (peerId, setWsConnected, setReadyToCommunicate) => {
                 log(`${getCurrentTimestamp()} - message.candidate`);
                 handleCandidate(message.candidate, message.source_id);
             }
+            log('>>>>> STEP 8 - Complete <<<<<');
         };
 
         websocket.onclose = () => {
@@ -127,17 +136,23 @@ const stopHeartbeat = () => {
 };
 
 export const initializeWebRTC = async (currentLocalPeerId, setWsConnected, setReadyToCommunicate) => {
+    log('>>>>> STEP 1 <<<<<');
     myLocalPeerId = currentLocalPeerId;
     log('client - initializeWebRTC - Initializing WebRTC for peer:', myLocalPeerId);
 
     try {
         initializeWebSocket(myLocalPeerId, setWsConnected, setReadyToCommunicate);
+        log('>>>>> STEP 1 - Complete <<<<<');
     } catch (error) {
         log('client - initializeWebRTC - Error initializing WebSocket:', error);
+        log('>>>>> STEP 1 - FAIL <<<<<');
     }
 };
 
 export const setTargetPeerId = (targetId, setReadyToCommunicate, peerStoreFolder) => {
+    log('>>>>> client - setTargetPeerId - targetId: ',targetId);
+    log('>>>>> client - setTargetPeerId - myLocalPeerId: ',myLocalPeerId);
+    
     targetPeerId = targetId;
     log('client - setTargetPeerId - targetPeerId set to:', targetPeerId);
     if (myLocalPeerId && targetPeerId) {
@@ -163,14 +178,23 @@ export const setHandleDataMessageCallback = (callback) => {
     handleDataMessageCallback = callback;
 };
 
+// Send TEXT Message
 export const sendMessage = async (setReadyToCommunicate, message, type = 'text', retries = 3) => {
+    log('>>>>> STEP 21 <<<<<');
     log('client - sendMessage - message:', message);
     const msg = JSON.stringify({ type, content: message });
     // ensure WebRTC is Open
+    log('>>>>> STEP 22 <<<<<');
+    log('>>>>> STEP 22 <<<<< - sendChannel: ',sendChannel);
+    log('>>>>> STEP 22 <<<<< - sendChannel.readyState: ',sendChannel.readyState);
     if (sendChannel && sendChannel.readyState === 'open') {
+        log('>>>>> STEP 22 - Complete <<<<<');
+
+        log('>>>>> STEP 23 <<<<<');
         sendChannel.send(msg);
         log('client - sendMessage - Sent message:', message);
         log('client - sendMessage - Sent msg:', msg);
+        log('>>>>> STEP 23 - Complete <<<<<');
     } else {
         log('client - sendMessage - Data channel is not open, trying to Open WebRTC.');
         // Try to open WebRTC
@@ -200,86 +224,57 @@ export const sendMessage = async (setReadyToCommunicate, message, type = 'text',
             log('client - sendMessage - Max retries reached. Message not sent.');
         }
     }
+    log('>>>>> STEP 21 - Complete<<<<<');
 };
 
-// const setupWebRTC = async (setReadyToCommunicate) => {
-//     log('client - setupWebRTC - Starting setup');
-
-//     const iceServers = await fetchTurnCredentials();
-//     log('client - setupWebRTC - iceServers: ', iceServers);
-
-//     localConnection = new RTCPeerConnection({ iceServers });
-//     peerConnections[targetPeerId] = localConnection;
-//     log('client - setupWebRTC - RTCPeerConnection created:', localConnection);
-
-//     sendChannel = localConnection.createDataChannel("fileTransfer");
-//     log('client - setupWebRTC - Data channel created:', sendChannel);
-
-//     sendChannel.onopen = () => handleSendChannelStatusChange(setReadyToCommunicate);
-//     sendChannel.onclose = () => handleSendChannelStatusChange(setReadyToCommunicate);
-//     sendChannel.onerror = (error) => log('client - sendChannel.onerror - Data channel error:', error);
-//     sendChannel.onmessage = (event) => log('client - sendChannel.onmessage - Data channel message received:', event.data);
-
-//     localConnection.ondatachannel = (event) => {
-//         log('client - localConnection.ondatachannel - Data channel received:', event.channel);
-//         receiveChannel = event.channel;
-//         setReceiveChannel(receiveChannel); // Set the receive channel
-//         receiveChannel.onopen = () => handleReceiveChannelStatusChange(setReadyToCommunicate);
-//         receiveChannel.onclose = () => handleReceiveChannelStatusChange(setReadyToCommunicate);
-//         receiveChannel.onerror = (error) => log('client - receiveChannel.onerror - Receive channel error:', error);
-//         receiveChannel.onmessage = (event) => handleReceiveMessage(event);
-//     };
-
-//     localConnection.onicecandidate = (event) => {
-//         if (event.candidate) {
-//             log('client - localConnection.onicecandidate - ICE candidate generated:', event.candidate);
-//             sendSignalMessage({ candidate: event.candidate, target_id: targetPeerId });
-//         }
-//     };
-
-//     localConnection.oniceconnectionstatechange = () => {
-//         log('client - localConnection.oniceconnectionstatechange - ICE connection state change:', localConnection.iceConnectionState);
-//         if (localConnection.iceConnectionState === 'failed' || localConnection.iceConnectionState === 'disconnected') {
-//             log('client - localConnection.oniceconnectionstatechange - Connection failed or disconnected');
-//             setReadyToCommunicate(false);
-//         }
-//     };
-
-//     localConnection.onicegatheringstatechange = () => log('client - localConnection.onicegatheringstatechange - ICE gathering state change:', localConnection.iceGatheringState);
-
-//     localConnection.onsignalingstatechange = () => log('client - localConnection.onsignalingstatechange - Signaling state change:', localConnection.signalingState);
-
-//     try {
-//         const offer = await localConnection.createOffer();
-//         log('client - setupWebRTC - Creating offer:', offer);
-//         await localConnection.setLocalDescription(offer);
-//         log('client - setupWebRTC - Local description set:', localConnection.localDescription);
-//         sendSignalMessage({ offer: localConnection.localDescription, target_id: targetPeerId });
-//     } catch (error) {
-//         log('client - setupWebRTC - Error creating offer:', error);
-//     }
-// };
-
 const setupWebRTC = async (setReadyToCommunicate, retries = 3, retryInterval = 1000) => {
+    log('>>>>> STEP 3 <<<<<');
     log('client - setupWebRTC - Starting setup');
+
+    const attemptReconnection = async (retryCount = 3, retryInterval = 5000) => {
+        for (let attempt = 0; attempt < retryCount; attempt++) {
+            log(`client - attemptReconnection - Attempt ${attempt + 1} of ${retryCount}`);
+            try {
+                await setupWebRTC(setReadyToCommunicate);
+                log('client - attemptReconnection - Reconnection successful');
+                return;
+            } catch (error) {
+                log(`client - attemptReconnection - Attempt ${attempt + 1} failed:`, error);
+                await new Promise(resolve => setTimeout(resolve, retryInterval));
+            }
+        }
+        log('client - attemptReconnection - Max retries reached. Could not reconnect.');
+    };
 
     const attemptSetup = async () => {
         try {
             const iceServers = await fetchTurnCredentials();
             log('client - setupWebRTC - iceServers: ', iceServers);
 
+            log('>>>>> STEP 10 <<<<<');
             localConnection = new RTCPeerConnection({ iceServers });
+            log('>>>>> STEP 10 - Complete <<<<<');
+
             peerConnections[targetPeerId] = localConnection;
             log('client - setupWebRTC - RTCPeerConnection created:', localConnection);
 
-            sendChannel = localConnection.createDataChannel("fileTransfer");
+            log('>>>>> STEP 4 <<<<<');
+            sendChannel = localConnection.createDataChannel("textMessagingChannel");
             log('client - setupWebRTC - Data channel created:', sendChannel);
+            log('>>>>> STEP 4 - Complete <<<<<');
 
-            sendChannel.onopen = () => handleSendChannelStatusChange(setReadyToCommunicate);
-            sendChannel.onclose = () => handleSendChannelStatusChange(setReadyToCommunicate);
+            sendChannel.onopen = () => {
+                log('client - sendChannel.onopen');
+                handleSendChannelStatusChange(setReadyToCommunicate);
+            }
+            sendChannel.onclose = () => {
+                log('client - sendChannel.onclose');
+                handleSendChannelStatusChange(setReadyToCommunicate);
+            }
             sendChannel.onerror = (error) => log('client - sendChannel.onerror - Data channel error:', error);
             sendChannel.onmessage = (event) => log('client - sendChannel.onmessage - Data channel message received:', event.data);
 
+            log('>>>>> STEP 5 <<<<<');
             localConnection.ondatachannel = (event) => {
                 log('client - localConnection.ondatachannel - Data channel received:', event.channel);
                 receiveChannel = event.channel;
@@ -292,16 +287,20 @@ const setupWebRTC = async (setReadyToCommunicate, retries = 3, retryInterval = 1
 
             localConnection.onicecandidate = (event) => {
                 if (event.candidate) {
+                    log('>>>>> STEP 9 <<<<<');
                     log('client - localConnection.onicecandidate - ICE candidate generated:', event.candidate);
                     sendSignalMessage({ candidate: event.candidate, target_id: targetPeerId });
+                    log('>>>>> STEP 9 - Complete <<<<<');
                 }
             };
+            log('>>>>> STEP 5 - Complete <<<<<');
 
             localConnection.oniceconnectionstatechange = () => {
                 log('client - localConnection.oniceconnectionstatechange - ICE connection state change:', localConnection.iceConnectionState);
                 if (localConnection.iceConnectionState === 'failed' || localConnection.iceConnectionState === 'disconnected') {
                     log('client - localConnection.oniceconnectionstatechange - Connection failed or disconnected');
                     setReadyToCommunicate(false);
+                    attemptReconnection();
                 }
             };
 
@@ -312,11 +311,15 @@ const setupWebRTC = async (setReadyToCommunicate, retries = 3, retryInterval = 1
             const offer = await localConnection.createOffer();
             log('client - setupWebRTC - Creating offer:', offer);
             await localConnection.setLocalDescription(offer);
+            log('>>>>> STEP 11 <<<<<');
             log('client - setupWebRTC - Local description set:', localConnection.localDescription);
             sendSignalMessage({ offer: localConnection.localDescription, target_id: targetPeerId });
+            log('>>>>> STEP 11 - Complete <<<<<');
 
+            log('>>>>> STEP 3 - Complete <<<<<');
         } catch (error) {
             log('client - setupWebRTC - Error during setup:', error);
+            log('>>>>> STEP 3  - FAIL<<<<<');
             throw error;
         }
     };
@@ -334,25 +337,86 @@ const setupWebRTC = async (setReadyToCommunicate, retries = 3, retryInterval = 1
     log('client - setupWebRTC - Max retries reached. Setup failed.');
 };
 
+// const handleOffer = async (offer, source_id, setReadyToCommunicate) => {
+//     log('>>>>> STEP 12 <<<<<');
+//     log('client - handleOffer - offer:', offer);
+//     log('client - handleOffer - source_id:', source_id);
 
+//     const iceServers = await fetchTurnCredentials();
+//     const peerConnection = new RTCPeerConnection({ iceServers });
+    
+//     log('>>>>> STEP 13 <<<<<');
+//     peerConnections[source_id] = peerConnection;
+//     log('client - handleOffer - RTCPeerConnection created for handling offer:', peerConnection);
+//     log('>>>>> STEP 13 - Complete <<<<<');
+
+//     // Handle pending ICE candidates
+//     if (pendingIceCandidates[source_id]) {
+//         pendingIceCandidates[source_id].forEach(candidate => {
+//             handleCandidate(candidate, source_id);
+//         });
+//         delete pendingIceCandidates[source_id];
+//     }
+
+//     peerConnection.ondatachannel = (event) => {
+//         log('client - handleOffer - Data channel received:', event.channel);
+//         receiveChannel = event.channel;
+//         setReceiveChannel(receiveChannel); // Set the receive channel
+//         receiveChannel.onopen = () => handleReceiveChannelStatusChange(setReadyToCommunicate);
+//         receiveChannel.onclose = () => handleReceiveChannelStatusChange(setReadyToCommunicate);
+//         receiveChannel.onerror = (error) => log('client - receiveChannel.onerror - Receive channel error:', error);
+//         receiveChannel.onmessage = (event) => handleReceiveMessage(event);
+//     };
+
+//     peerConnection.onicecandidate = (event) => {
+//         if (event.candidate) {
+//             log('client - handleOffer - ICE candidate generated:', event.candidate);
+//             sendSignalMessage({ candidate: event.candidate, target_id: source_id });
+//         }
+//     };
+
+//     peerConnection.oniceconnectionstatechange = () => log('client - handleOffer - ICE connection state change:', peerConnection.iceConnectionState);
+
+//     peerConnection.onicegatheringstatechange = () => log('client - handleOffer - ICE gathering state change:', peerConnection.iceGatheringState);
+
+//     peerConnection.onsignalingstatechange = () => log('client - handleOffer - Signaling state change:', peerConnection.signalingState);
+
+//     try {
+//         log('>>>>> STEP 14 <<<<<');
+//         await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+//         log('>>>>> STEP 14 - Complete <<<<<');
+//         log('client - handleOffer - Remote description set for offer:', offer);
+
+//         const answer = await peerConnection.createAnswer();
+//         log('>>>>> STEP 15 <<<<<');
+//         log('client - handleOffer - Creating answer:', answer);
+//         await peerConnection.setLocalDescription(answer);
+//         log('>>>>> STEP 15 - Complete <<<<<');
+
+//         log('>>>>> STEP 16 <<<<<');
+//         log('client - handleOffer - Local description set for answer:', peerConnection.localDescription);
+//         sendSignalMessage({ answer: peerConnection.localDescription, target_id: source_id });
+//         processPendingIceCandidates(source_id);
+//         log('>>>>> STEP 16 - Complete <<<<<');
+//         log('>>>>> STEP 12 - Complete <<<<<');
+//     } catch (error) {
+//         log('client - handleOffer - Error handling offer:', error);
+//         log('>>>>> STEP 12 - FAIL <<<<<');
+//     }
+// };
 
 const handleOffer = async (offer, source_id, setReadyToCommunicate) => {
+    log('>>>>> STEP 12 <<<<<');
     log('client - handleOffer - offer:', offer);
     log('client - handleOffer - source_id:', source_id);
 
     const iceServers = await fetchTurnCredentials();
     const peerConnection = new RTCPeerConnection({ iceServers });
 
+    log('>>>>> STEP 13 <<<<<');
     peerConnections[source_id] = peerConnection;
     log('client - handleOffer - RTCPeerConnection created for handling offer:', peerConnection);
-
-    // Handle pending ICE candidates
-    if (pendingIceCandidates[source_id]) {
-        pendingIceCandidates[source_id].forEach(candidate => {
-            handleCandidate(candidate, source_id);
-        });
-        delete pendingIceCandidates[source_id];
-    }
+    log('>>>>> STEP 13 - Complete <<<<<');
 
     peerConnection.ondatachannel = (event) => {
         log('client - handleOffer - Data channel received:', event.channel);
@@ -371,59 +435,108 @@ const handleOffer = async (offer, source_id, setReadyToCommunicate) => {
         }
     };
 
-    peerConnection.oniceconnectionstatechange = () => log('client - handleOffer - ICE connection state change:', peerConnection.iceConnectionState);
+    peerConnection.oniceconnectionstatechange = () => {
+        log('client - handleOffer - ICE connection state change:', peerConnection.iceConnectionState);
+        if (peerConnection.iceConnectionState === 'failed' || peerConnection.iceConnectionState === 'disconnected') {
+            log('client - handleOffer - ICE connection failed or disconnected');
+            setReadyToCommunicate(false);
+        }
+    };
 
     peerConnection.onicegatheringstatechange = () => log('client - handleOffer - ICE gathering state change:', peerConnection.iceGatheringState);
 
     peerConnection.onsignalingstatechange = () => log('client - handleOffer - Signaling state change:', peerConnection.signalingState);
 
     try {
+        log('>>>>> STEP 14 <<<<<');
         await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+        log('>>>>> STEP 14 - Complete <<<<<');
         log('client - handleOffer - Remote description set for offer:', offer);
 
         const answer = await peerConnection.createAnswer();
+        log('>>>>> STEP 15 <<<<<');
         log('client - handleOffer - Creating answer:', answer);
         await peerConnection.setLocalDescription(answer);
+        log('>>>>> STEP 15 - Complete <<<<<');
+
+        log('>>>>> STEP 16 <<<<<');
         log('client - handleOffer - Local description set for answer:', peerConnection.localDescription);
         sendSignalMessage({ answer: peerConnection.localDescription, target_id: source_id });
+        processPendingIceCandidates(source_id); // Ensure pending ICE candidates are processed
+        log('>>>>> STEP 16 - Complete <<<<<');
+        log('>>>>> STEP 12 - Complete <<<<<');
     } catch (error) {
         log('client - handleOffer - Error handling offer:', error);
+        log('>>>>> STEP 12 - FAIL <<<<<');
     }
 };
 
+
 const handleAnswer = async (answer, source_id) => {
+    log('>>>>> STEP 17 <<<<<');
     log('client - handleAnswer - answer:', answer);
     try {
         const peerConnection = peerConnections[source_id];
         if (!peerConnection) {
             throw new Error(`PeerConnection not found for source_id: ${source_id}`);
         }
+        log('>>>>> STEP 18 <<<<<');
         await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+        log('>>>>> STEP 18 - Complete <<<<<');
+        
+        log('>>>>> STEP 19 <<<<<');
         log('client - handleAnswer - Remote description set for answer:', answer);
         processPendingIceCandidates(source_id);
+        log('>>>>> STEP 19 - Complete <<<<<');
+        log('>>>>> STEP 17 - Complete <<<<<');
     } catch (error) {
         log('client - handleAnswer - Error handling answer:', error);
+        log('>>>>> STEP 17 - FAIL <<<<<');
     }
 };
+
+// const handleCandidate = async (candidate, source_id) => {
+//     log('client - handleCandidate - candidate:', candidate);
+//     try {
+//         const peerConnection = peerConnections[source_id];
+//         if (!peerConnection) {
+//             if (!pendingIceCandidates[source_id]) {
+//                 pendingIceCandidates[source_id] = [];
+//             }
+//             pendingIceCandidates[source_id].push(candidate);
+//             log(`client - handleCandidate - PeerConnection not found for source_id: ${source_id}. ICE candidate queued.`);
+//             return;
+//         }
+//         log('>>>>> STEP 20 <<<<<');
+//         await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+//         log('>>>>> STEP 20 - Complete <<<<<');
+//         log('client - handleCandidate - ICE candidate added:', candidate);
+//     } catch (error) {
+//         log('client - handleCandidate - Error handling ICE candidate:', error);
+//     }
+// };
 
 const handleCandidate = async (candidate, source_id) => {
     log('client - handleCandidate - candidate:', candidate);
     try {
         const peerConnection = peerConnections[source_id];
-        if (!peerConnection) {
+        if (!peerConnection || !peerConnection.remoteDescription) {
             if (!pendingIceCandidates[source_id]) {
                 pendingIceCandidates[source_id] = [];
             }
             pendingIceCandidates[source_id].push(candidate);
-            log(`client - handleCandidate - PeerConnection not found for source_id: ${source_id}. ICE candidate queued.`);
+            log(`client - handleCandidate - PeerConnection not found or remoteDescription not set for source_id: ${source_id}. ICE candidate queued.`);
             return;
         }
+        log('>>>>> STEP 20 <<<<<');
         await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+        log('>>>>> STEP 20 - Complete <<<<<');
         log('client - handleCandidate - ICE candidate added:', candidate);
     } catch (error) {
         log('client - handleCandidate - Error handling ICE candidate:', error);
     }
 };
+
 
 const sendSignalMessage = async (message) => {
     log('client - sendSignalMessage - message:', message);
@@ -436,18 +549,24 @@ const sendSignalMessage = async (message) => {
 };
 
 const handleSendChannelStatusChange = async (setReadyToCommunicate) => {
+    log('client - handleSendChannelStatusChange - called');
     if (sendChannel) {
         const state = sendChannel.readyState;
         log('client - handleSendChannelStatusChange - Send channel state is:', state);
         setReadyToCommunicate(state === 'open');
+    } else {
+        log('client - handleSendChannelStatusChange - no sendChannel');
     }
 };
 
 const handleReceiveChannelStatusChange = async (setReadyToCommunicate) => {
+    log('client - handleReceiveChannelStatusChange - called');
     if (receiveChannel) {
         const state = receiveChannel.readyState;
         log('client - handleReceiveChannelStatusChange - Receive channel state is:', state);
         setReadyToCommunicate(state === 'open');
+    } else {
+        log('client - handleReceiveChannelStatusChange - no sendChannel');
     }
 };
 
@@ -583,22 +702,43 @@ const storeReceivedChunk = async (peerStoreFolder, folderName, chunkData) => {
     }
 };
 
+// const processPendingIceCandidates = async (source_id) => {
+//     log('client - processPendingIceCandidates - Processing pending ICE candidates for:', source_id);
+//     remoteIceCandidates.forEach(async (candidate) => {
+//         try {
+//             const peerConnection = peerConnections[source_id];
+//             if (!peerConnection) {
+//                 throw new Error(`PeerConnection not found for source_id: ${source_id}`);
+//             }
+//             await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+//             log('client - processPendingIceCandidates - Processed pending ICE candidate:', candidate);
+//         } catch (error) {
+//             log('client - processPendingIceCandidates - Error processing pending ICE candidate:', error);
+//         }
+//     });
+//     remoteIceCandidates = [];
+// };
+
 const processPendingIceCandidates = async (source_id) => {
     log('client - processPendingIceCandidates - Processing pending ICE candidates for:', source_id);
-    remoteIceCandidates.forEach(async (candidate) => {
-        try {
-            const peerConnection = peerConnections[source_id];
-            if (!peerConnection) {
-                throw new Error(`PeerConnection not found for source_id: ${source_id}`);
+    const peerConnection = peerConnections[source_id];
+    if (!peerConnection || !peerConnection.remoteDescription) {
+        log('client - processPendingIceCandidates - PeerConnection not found or remoteDescription not set. Aborting.');
+        return;
+    }
+    if (pendingIceCandidates[source_id]) {
+        for (const candidate of pendingIceCandidates[source_id]) {
+            try {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                log('client - processPendingIceCandidates - Processed pending ICE candidate:', candidate);
+            } catch (error) {
+                log('client - processPendingIceCandidates - Error processing pending ICE candidate:', error);
             }
-            await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-            log('client - processPendingIceCandidates - Processed pending ICE candidate:', candidate);
-        } catch (error) {
-            log('client - processPendingIceCandidates - Error processing pending ICE candidate:', error);
         }
-    });
-    remoteIceCandidates = [];
+        delete pendingIceCandidates[source_id];
+    }
 };
+
 
 export const copy_file_to_peers = async (setWsConnected, setReadyToCommunicate, list_of_peers, kvPairs, peerStoreFolder) => {
     log('client - copy_file_to_peers called - list_of_peers: ', list_of_peers);
@@ -610,121 +750,6 @@ export const copy_file_to_peers = async (setWsConnected, setReadyToCommunicate, 
         await establishPeerConnection(setWsConnected, setReadyToCommunicate, peerId, kvPairs, peerStoreFolder);
     });
 };
-
-// const establishPeerConnection = async (setWsConnected, setReadyToCommunicate, peerId, kvPairs, peerStoreFolder) => {
-//     log('client - establishPeerConnection called - peerId: ', peerId);
-//     log('client - establishPeerConnection called - peerStoreFolder: ', peerStoreFolder);
-
-//     const MAX_CHUNK_SIZE = 16 * 1024; // max chunk size (16 KB) for WebRTC Channel
-//     const MAX_RETRIES = 3;
-//     let retryCount = 0;
-
-//     // Step 1: Check WebSocket and establish if not open
-//     while ((!websocket || websocket.readyState !== WebSocket.OPEN) && retryCount < MAX_RETRIES) {
-//         try {
-//             await initializeWebSocket(myLocalPeerId, setWsConnected, setReadyToCommunicate);
-//             log('client - establishPeerConnection - Step 1 complete.');
-//         } catch (error) {
-//             log('client - establishPeerConnection - Error initializing WebSocket:', error);
-//             retryCount++;
-//             if (retryCount >= MAX_RETRIES) return;
-//         }
-//     }
-
-//     // Step 2: Fetch ICE servers
-//     let iceServers;
-//     try {
-//         iceServers = await fetchTurnCredentials();
-//         log('client - establishPeerConnection - iceServers: ', iceServers);
-//         log('client - establishPeerConnection - Step 2 complete.');
-//     } catch (error) {
-//         log('client - establishPeerConnection - Error fetching ICE servers:', error);
-//         return;
-//     }
-
-//     // Step 3: Ensure DataChannel is created
-//     const peerConnection = new RTCPeerConnection({ iceServers });
-//     peerConnections[peerId] = peerConnection;
-
-//     sendChannel = peerConnection.createDataChannel("fileTransfer");
-//     sendChannel.onopen = async () => {
-//         const transferId = uuidv4();
-//         const fileTransferInfo = {
-//             type: 'file_transfer_info',
-//             transferId,
-//             sourceId: myLocalPeerId,
-//             kvPairsLength: kvPairs.length,
-//             maxChunkSize: MAX_CHUNK_SIZE
-//         };
-    
-//         log('client - establishPeerConnection - Step 3 complete.');
-
-//         // Step 4: Send handshake message
-//         sendSignalMessage(fileTransferInfo, websocket);
-//         log('client - establishPeerConnection - Step 4 complete.');
-
-//         // Step 5: Wait for handshake acknowledgment
-//         const handleHandshakeAck = async (event) => {
-//             const data = JSON.parse(event.data);
-//             if (data.type === 'file_transfer_info_ack' && data.transferId === transferId) {
-//                 log('client - establishPeerConnection - Handshake acknowledged:', data);
-//                 log('client - establishPeerConnection - Step 5 complete.');
-
-//                 // Step 6: Send all chunks in kvPairs
-//                 for (let kv of kvPairs) {
-//                     const kvString = JSON.stringify(kv);
-//                     const kvBuffer = new TextEncoder().encode(kvString);
-//                     for (let i = 0; i < kvBuffer.length; i += MAX_CHUNK_SIZE) {
-//                         const chunk = kvBuffer.slice(i, i + MAX_CHUNK_SIZE);
-//                         sendChannel.send(chunk);
-//                         log('client - establishPeerConnection - Sent chunk:', chunk);
-//                     }
-//                 }
-//                 log('client - establishPeerConnection - Step 6 complete.');
-
-//                 // Step 7: Send new file transfer info with new UUID after all chunks are sent
-//                 const newTransferId = uuidv4();
-//                 const newFileTransferInfo = {
-//                     type: 'file_transfer_info',
-//                     transferId: newTransferId,
-//                     sourceId: myLocalPeerId,
-//                     kvPairsLength: kvPairs.length,
-//                     maxChunkSize: MAX_CHUNK_SIZE
-//                 };
-//                 sendSignalMessage(newFileTransferInfo, websocket);
-//                 log('client - establishPeerConnection - Step 7 complete.');
-//             }
-//         };
-
-//         sendChannel.onmessage = handleHandshakeAck;
-//     };
-
-//     peerConnection.ondatachannel = (event) => {
-//         log('client - establishPeerConnection - Data channel received:', event.channel);
-//         receiveChannel = event.channel;
-//         receiveChannel.onopen = () => handleReceiveChannelStatusChange(setReadyToCommunicate);
-//         receiveChannel.onclose = () => handleReceiveChannelStatusChange(setReadyToCommunicate);
-//         receiveChannel.onerror = (error) => log('client - receiveChannel.onerror - Receive channel error:', error);
-//         receiveChannel.onmessage = (event) => handleReceiveMessage(event);
-//     };
-
-//     peerConnection.onicecandidate = (event) => {
-//         if (event.candidate) {
-//             log('client - peerConnection.onicecandidate - ICE candidate generated:', event.candidate);
-//             sendSignalMessage({ candidate: event.candidate, target_id: peerId }, websocket);
-//         }
-//     };
-
-//     try {
-//         const offer = await peerConnection.createOffer();
-//         log('client - establishPeerConnection - Creating offer:', offer);
-//         await peerConnection.setLocalDescription(offer);
-//         log('client - establishPeerConnection - Local description set:', peerConnection.localDescription);
-//         sendSignalMessage({ offer: peerConnection.localDescription, target_id: peerId }, websocket);
-//     } catch (error) {
-//         log('client - establishPeerConnection - Error creating offer:', error);
-//     }
-// };
 
 
 const establishPeerConnection = async (setWsConnected, setReadyToCommunicate, peerId, kvPairs, peerStoreFolder) => {

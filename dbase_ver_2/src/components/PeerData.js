@@ -38,7 +38,9 @@ const PeerData = () => {
 
     useEffect(() => {
         if (bnodeid) {
-            // initializeWebRTC(bnodeid, setWsConnected, setReadyToCommunicate);
+            console.log('PeerData - useEffect - readyToCommunicate: ',readyToCommunicate);
+            console.log('PeerData - useEffect - targetPeerId: ',targetPeerId);
+            console.log('PeerData - useEffect - wsConnected: ',wsConnected);
         }
     }, [bnodeid]);
 
@@ -46,10 +48,12 @@ const PeerData = () => {
         const targetId = e.target.value;
         setTargetPeerIdState(targetId);
         setTargetPeerId(targetId, setReadyToCommunicate);
+        console.log('PeerData - handleTargetPeerIdChange - readyToCommunicate: ',readyToCommunicate);
     };
 
     const handleSendMessage = () => {
         if (message) {
+            console.log('PeerData - handleSendMessage - readyToCommunicate: ',readyToCommunicate);
             sendMessage(setReadyToCommunicate, message);
             setMessage('');
         }
@@ -139,6 +143,9 @@ const PeerData = () => {
     };
 
     const isDisabled = !readyToCommunicate || !targetPeerId || !wsConnected;
+    console.log('PeerData  - readyToCommunicate: ',readyToCommunicate);
+    console.log('PeerData  - targetPeerId: ',targetPeerId);
+    console.log('PeerData  - wsConnected: ',wsConnected);
 
     return (
         <div className={themeClass}>
@@ -150,6 +157,8 @@ const PeerData = () => {
                             <div>
                                 <span className="me-3" style={{ minWidth: '150px' }}>My BnodeId (peer id):</span>
                                 <a>{bnodeid}</a>
+                                <br></br>
+                                <span>readyToCommunicate: {readyToCommunicate} || targetPeerId: {targetPeerId} || wsConnected: {wsConnected}</span>
                             </div>
                         </div>
                         <div className="d-flex align-items-center">
